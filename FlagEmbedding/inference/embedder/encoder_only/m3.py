@@ -340,7 +340,10 @@ class M3Embedder(AbsEmbedder):
         if device is None:
             device = self.target_devices[0]
 
-        if device == "cpu":
+        # keep bf16 always (AMX/AVX512-BF16); keep fp16 only if the CPU supports it (AMX-FP16/AVX512-FP16)
+        if device == "cpu" and not self.use_bf16 and not (
+            self.use_fp16 and torch.ops.mkldnn._is_mkldnn_fp16_supported()
+        ):
             self.model.float()
 
         self.model.to(device)
@@ -639,7 +642,10 @@ class M3Embedder(AbsEmbedder):
         if device is None:
             device = self.target_devices[0]
 
-        if device == "cpu":
+        # keep bf16 always (AMX/AVX512-BF16); keep fp16 only if the CPU supports it (AMX-FP16/AVX512-FP16)
+        if device == "cpu" and not self.use_bf16 and not (
+            self.use_fp16 and torch.ops.mkldnn._is_mkldnn_fp16_supported()
+        ):
             self.model.float()
 
         self.model.to(device)

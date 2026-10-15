@@ -20,6 +20,8 @@ class BaseReranker(AbsReranker):
             load a model from HuggingFace Hub with the name.
         use_fp16 (bool, optional): If true, use half-precision floating-point to speed up computation with a slight performance 
             degradation. Defaults to :data:`False`.
+        use_bf16 (bool, optional): If true, load and run the model in bfloat16. Works on CPU with AMX/AVX512-BF16 support.
+            Defaults to :data:`False`.
         query_instruction_for_rerank (Optional[str], optional): Query instruction for retrieval tasks, which will be used with
             with :attr:`query_instruction_format`. Defaults to :data:`None`.
         query_instruction_format (str, optional): The template for :attr:`query_instruction_for_rerank`. Defaults to :data:`"{}{}"`.
@@ -36,6 +38,7 @@ class BaseReranker(AbsReranker):
         self,
         model_name_or_path: str,
         use_fp16: bool = False,
+        use_bf16: bool = False,
         query_instruction_for_rerank: Optional[str] = None,
         query_instruction_format: str = "{}{}", # specify the format of query_instruction_for_rerank
         passage_instruction_for_rerank: Optional[str] = None,
@@ -64,6 +67,7 @@ class BaseReranker(AbsReranker):
             normalize=normalize,
             **kwargs
         )
+        self.use_bf16 = use_bf16
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_name_or_path, 
             trust_remote_code=trust_remote_code, 
@@ -72,7 +76,8 @@ class BaseReranker(AbsReranker):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name_or_path, 
             trust_remote_code=trust_remote_code, 
-            cache_dir=cache_dir
+            cache_dir=cache_dir,
+            dtype=torch.bfloat16 if use_bf16 else torch.float32
         )
 
     @torch.no_grad()
@@ -111,8 +116,10 @@ class BaseReranker(AbsReranker):
         if device is None:
             device = self.target_devices[0]
 
-        if device == "cpu": self.use_fp16 = False
-        if self.use_fp16: self.model.half()
+        # disable fp16 on CPU only when the hardware can't run it (no AMX-FP16/AVX512-FP16)
+        if device == "cpu" and not torch.ops.mkldnn._is_mkldnn_fp16_supported():
+            self.use_fp16 = False
+        if self.use_fp16 and not self.use_bf16: self.model.half()
 
         self.model.to(device)
         self.model.eval()
