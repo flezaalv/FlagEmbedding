@@ -3,19 +3,20 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}" .sh)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 PYTHON_SCRIPT="$SCRIPT_DIR/m3_single_device.py"
-LOG_ROOT="${M3_LOG_ROOT:-$SCRIPT_DIR/logs}"
+LOG_ROOT="${M3_LOG_ROOT:-/logs/logs_${SCRIPT_NAME}}"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 ARCHITECTURE="$(uname -m)"
 KERNEL_PMU_ARCHITECTURE="$(cat /sys/devices/cpu/caps/pmu_name 2>/dev/null || true)"
 KERNEL_PMU_TAG="${KERNEL_PMU_ARCHITECTURE:-unknown_pmu}"
 KERNEL_PMU_TAG="$(printf '%s' "$KERNEL_PMU_TAG" | sed -E 's/[^A-Za-z0-9_.-]+/_/g')"
 RUN_DIR="$LOG_ROOT/${TIMESTAMP}_${KERNEL_PMU_TAG}"
-LATEST_DIR="$LOG_ROOT/latest"
 ARCHITECTURE_LOG="$RUN_DIR/architecture_info.txt"
 
-mkdir -p "$RUN_DIR" "$LATEST_DIR"
+mkdir -p "$LOG_ROOT" || exit 1
+mkdir "$RUN_DIR" || exit 1
 
 CPU_VENDOR="$(awk -F: '/^vendor_id/ {gsub(/^[ \t]+/, "", $2); print $2; exit}' /proc/cpuinfo)"
 CPU_MODEL_NAME="$(awk -F: '/^model name/ {gsub(/^[ \t]+/, "", $2); print $2; exit}' /proc/cpuinfo)"
@@ -81,10 +82,6 @@ for precision in fp32 bf16 fp16; do
         }'
 
     status="${PIPESTATUS[0]}"
-    cp "$combined_log" "$LATEST_DIR/${precision}_combined.log"
-    cp "$onednn_log" "$LATEST_DIR/${precision}_onednn.log"
-    cp "$application_log" "$LATEST_DIR/${precision}_application.log"
-
     if [[ "$status" -ne 0 ]]; then
         printf 'ERROR: %s failed with exit code %s\n' "$precision" "$status" >&2
         exit "$status"
@@ -95,6 +92,4 @@ for precision in fp32 bf16 fp16; do
         printf 'not reported\n' >> "$ARCHITECTURE_LOG"
 done
 
-cp "$ARCHITECTURE_LOG" "$LATEST_DIR/architecture_info.txt"
-cp "$RUN_DIR/bf16_combined.log" "$LOG_ROOT/combined_latest.log"
-printf '\nLatest combined log: %s\n' "$LOG_ROOT/combined_latest.log"
+printf '\nLogs and results saved in: %s\n' "$RUN_DIR"
