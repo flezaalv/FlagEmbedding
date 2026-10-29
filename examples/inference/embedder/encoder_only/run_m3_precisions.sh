@@ -67,7 +67,7 @@ for precision in fp32 bf16 fp16; do
         cd "$PROJECT_ROOT" || exit 1
         M3_PRECISION="$precision" \
         PYTHONUNBUFFERED=1 \
-        ONEDNN_VERBOSE=1 \
+        ONEDNN_VERBOSE="profile,dispatch" \
         python -u "$PYTHON_SCRIPT" 2>&1
     ) | tee "$combined_log" | awk \
         -v onednn="$onednn_log" \
