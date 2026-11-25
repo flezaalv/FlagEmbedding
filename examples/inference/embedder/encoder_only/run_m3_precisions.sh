@@ -66,6 +66,9 @@ for precision in fp32 bf16 fp16; do
     (
         cd "$PROJECT_ROOT" || exit 1
         M3_PRECISION="$precision" \
+        M3_TORCH_PROFILE="${M3_TORCH_PROFILE:-0}" \
+        M3_PROFILER_DIR="${M3_PROFILER_DIR:-$RUN_DIR}" \
+        M3_PROFILER_PREFIX="${M3_PROFILER_PREFIX:-${precision}_m3_profiler}" \
         PYTHONUNBUFFERED=1 \
         ONEDNN_VERBOSE="profile,dispatch" \
         python -u "$PYTHON_SCRIPT" 2>&1
